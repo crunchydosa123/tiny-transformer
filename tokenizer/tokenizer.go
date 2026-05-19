@@ -55,6 +55,131 @@ func (t *Tokenizer) Decode(tokens []int) string {
 	return strings.Join(words, " ")
 }
 
+type BPETokenizer struct {
+	Vocab        map[string]int
+	ReverseVocab map[int]string
+	Merges       map[string]string
+	NextID       int
+}
+
+func CountPairs(words [][]string) map[string]int {
+	pairs := make(map[string]int)
+
+	for _, word := range words {
+		for i := 0; i < len(word)-1; i++ {
+			pair := word[i] + " " + word[i+1]
+			pairs[pair]++
+		}
+	}
+
+	return pairs
+}
+
+func BestPair(pairs map[string]int) string {
+	max := -1
+	best := ""
+
+	for pair, count := range pairs {
+		if count > max {
+			max = count
+			best = pair
+		}
+	}
+
+	return best
+}
+
+func MergePair(words [][]string, pair string) [][]string {
+	parts := strings.Split(pair, " ")
+	a, b := parts[0], parts[1]
+
+	var result [][]string
+
+	for _, word := range words {
+		var merged []string
+
+		i := 0
+		for i < len(word) {
+			if i < len(word)-1 &&
+				word[i] == a &&
+				word[i+1] == b {
+
+				merged = append(merged, a+b)
+				i += 2
+			} else {
+				merged = append(merged, word[i])
+				i++
+			}
+		}
+
+		result = append(result, merged)
+	}
+
+	return result
+}
+
+func (b *BPETokenizer) Train(texts []string, numMerges int) {
+	var words [][]string
+
+	for _, text := range texts {
+		for _, word := range strings.Fields(text) {
+			chars := strings.Split(word, "")
+			words = append(words, chars)
+		}
+	}
+
+	for i := 0; i < numMerges; i++ {
+		pairs := CountPairs(words)
+
+		best := BestPair(pairs)
+
+		if best == "" {
+			break
+		}
+
+		fmt.Println("Merging:", best)
+
+		words = MergePair(words, best)
+
+		token := strings.ReplaceAll(best, " ", "")
+		b.Merges[best] = token
+
+		if _, exists := b.Vocab[token]; !exists {
+			b.Vocab[token] = b.NextID
+			b.ReverseVocab[b.NextID] = token
+			b.NextID++
+		}
+	}
+}
+
+func (b *BPETokenizer) Encode(word string) []string {
+	tokens := strings.Split(word, "")
+
+	for {
+		changed := false
+
+		for i := 0; i < len(tokens)-1; i++ {
+			pair := tokens[i] + " " + tokens[i+1]
+
+			if merged, exists := b.Merges[pair]; exists {
+				newTokens := append([]string{}, tokens[:i]...)
+				newTokens = append(newTokens, merged)
+				newTokens = append(newTokens, tokens[i+2:]...)
+
+				tokens = newTokens
+				changed = true
+				break
+			}
+		}
+
+		if !changed {
+			break
+		}
+	}
+
+	return tokens
+}
+
 func main() {
 	tokenizer := NewTokenizer()
 
