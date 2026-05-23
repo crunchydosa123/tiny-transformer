@@ -1,11 +1,11 @@
 package embeddings
 
-import "math/rand/v2"
+import (
+	"math/rand"
+)
 
 type Embedding struct {
-	VocabSize int
-	EmbedDim  int
-	Weights   [][]float64
+	Weights [][]float64
 }
 
 func NewEmbedding(vocabSize, embedDim int) *Embedding {
@@ -20,8 +20,16 @@ func NewEmbedding(vocabSize, embedDim int) *Embedding {
 	}
 
 	return &Embedding{
-		VocabSize: vocabSize,
-		EmbedDim:  embedDim,
-		Weights:   weights,
+		Weights: weights,
 	}
+}
+
+func (e *Embedding) Forward(tokens []int) [][]float64 {
+	output := make([][]float64, len(tokens))
+
+	for i, token := range tokens {
+		output[i] = e.Weights[token]
+	}
+
+	return output
 }
